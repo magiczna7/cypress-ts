@@ -32,7 +32,7 @@ jobs:
           npx cypress run \
             --browser chrome \
             --env "login=${{ secrets.USERNAME }},password=${{ secrets.PASSWORD }}"
-      - name: Warunkowe udostępnienie screenshotów przy failu
+      - name: Save screenshots on failure
         uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -68,7 +68,7 @@ jobs:
           npx cypress run \
             --browser firefox \
             --env "login=${{ secrets.USERNAME }},password=${{ secrets.PASSWORD }}"
-      - name: Warunkowe udostępnienie screenshotów przy failu
+      - name: Save screenshots on failure
         uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -96,7 +96,9 @@ jobs:
           chmod +x run-docker-compose-ci.sh
           ./run-docker-compose-ci.sh
       - name: Install Microsoft Edge
-        run: curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft-archive-keyring.gpg && sudo mv microsoft-archive-keyring.gpg /usr/share/keyrings/ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/edge stable main" | sudo tee /etc/apt/sources.list.d/microsoft-edge-stable.list && sudo apt update && sudo apt install -y microsoft-edge-stable
+        run: |
+          chmod +x scripts/install-edge.sh
+          ./scripts/install-edge.sh
       - name: Install dependencies
         run: npm install
       - name: Run tests
@@ -104,10 +106,31 @@ jobs:
           npx cypress run \
             --browser edge \
             --env "login=${{ secrets.USERNAME }},password=${{ secrets.PASSWORD }}"
-      - name: Warunkowe udostępnienie screenshotów przy failu
+      - name: Save screenshots on failure
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-screenshots
           path: cypress/screenshots
           if-no-files-found: ignore
+      - name: Load test report history
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+      - name: Build test report
+        uses: simple-elf/allure-report-action@v1.7
+        if: always()
+        with:
+          gh_pages: gh-pages
+          allure_history: allure-history
+          allure_results: allure-results
+      - name: Publish test report
+        uses: peaceiris/actions-gh-pages@v3
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
